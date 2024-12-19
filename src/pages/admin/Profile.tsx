@@ -7,10 +7,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function Profile() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isLoggedIn } = useAuth();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [searchDate, setSearchDate] = useState("");
   const [searchAmount, setSearchAmount] = useState("");
@@ -18,22 +20,35 @@ export default function Profile() {
   // Check authentication and get user email
   useEffect(() => {
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        if (error) throw error;
+        
+        if (!session) {
+          navigate("/login");
+          return;
+        }
+        
+        console.log("Session found:", session);
+        setUserEmail(session.user.email);
+      } catch (error) {
+        console.error("Auth error:", error);
+        toast({
+          title: "Authentication Error",
+          description: "Please sign in again",
+          variant: "destructive",
+        });
         navigate("/login");
-        return;
       }
-      console.log("Session found:", session);
-      setUserEmail(session.user.email);
     };
 
     checkAuth();
-  }, [navigate]);
+  }, [navigate, toast]);
 
   // Fetch member profile data
   const { data: memberData, isLoading: memberLoading } = useQuery({
     queryKey: ['member-profile', userEmail],
-    enabled: !!userEmail,
+    enabled: !!userEmail && isLoggedIn,
     queryFn: async () => {
       console.log('Fetching profile for email:', userEmail);
       
@@ -64,6 +79,10 @@ export default function Profile() {
       return data;
     },
   });
+
+  if (!isLoggedIn) {
+    return null;
+  }
 
   if (memberLoading) {
     return (

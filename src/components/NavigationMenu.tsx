@@ -60,22 +60,27 @@ export function NavigationMenu() {
 
   const handleLogout = async () => {
     try {
-      // First check if we have a session
+      // First check if we actually have a session
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        console.log("No active session found, redirecting to login");
+        console.log("No active session found, cleaning up local state");
         setIsLoggedIn(false);
         navigate('/login');
         return;
       }
 
-      const { error } = await supabase.auth.signOut();
+      // Attempt to sign out
+      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      
       if (error) {
         console.error("Logout error:", error);
+        // Even if remote logout fails, we should clean up local state
+        setIsLoggedIn(false);
+        navigate('/login');
         toast({
-          title: "Logout failed",
-          description: error.message,
+          title: "Session ended",
+          description: "You have been logged out due to an error.",
           variant: "destructive",
         });
         return;
@@ -89,7 +94,7 @@ export function NavigationMenu() {
       navigate("/login");
     } catch (error) {
       console.error("Logout error:", error);
-      // If we catch an error here, we should still redirect to login
+      // If we catch an error here, we should still clean up local state
       setIsLoggedIn(false);
       navigate('/login');
       toast({

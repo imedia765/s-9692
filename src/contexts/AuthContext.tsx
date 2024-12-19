@@ -37,42 +37,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    console.log("Starting logout process...");
+    
+    // Immediately clear local state
+    setIsLoggedIn(false);
+    
     try {
-      // Clear local state first to prevent UI flashing
-      setIsLoggedIn(false);
-      
-      // Attempt to sign out without checking session first
-      const { error } = await supabase.auth.signOut({
-        scope: 'local'  // Only clear the local session first
-      });
-      
-      if (error) {
-        console.error("Local logout failed:", error);
-      }
-
-      // Then try to clear all sessions globally
+      // First try local logout
+      console.log("Attempting local logout...");
       try {
-        await supabase.auth.signOut({
-          scope: 'global'
-        });
-      } catch (globalError) {
-        console.error("Global logout failed:", globalError);
-        // Don't throw here, we already cleared local session
+        const { error: localError } = await supabase.auth.signOut({ scope: 'local' });
+        if (localError) {
+          console.warn("Local logout error:", localError);
+        }
+      } catch (localError) {
+        console.warn("Local logout failed:", localError);
       }
 
-      toast({
-        title: "Success",
-        description: "Logged out successfully",
-      });
+      // Then try global logout
+      console.log("Attempting global logout...");
+      try {
+        const { error: globalError } = await supabase.auth.signOut({ scope: 'global' });
+        if (globalError) {
+          console.warn("Global logout error:", globalError);
+        }
+      } catch (globalError) {
+        console.warn("Global logout failed:", globalError);
+      }
+
+      // Clear any remaining session data
+      await supabase.auth.clearSession();
       
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully",
+      });
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("Logout process error:", error);
       toast({
         title: "Notice",
-        description: "Session ended locally",
+        description: "Session ended",
       });
     } finally {
-      // Always navigate to login page and ensure local state is cleared
+      // Always ensure we navigate to login and clear local state
+      console.log("Finalizing logout...");
       setIsLoggedIn(false);
       navigate("/login");
     }

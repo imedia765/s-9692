@@ -53,55 +53,42 @@ export function NavigationMenu() {
     };
   }, [toast, navigate]);
 
-  const handleNavigation = (path: string) => {
-    setOpen(false);
-    navigate(path);
-  };
-
   const handleLogout = async () => {
     try {
-      // First check if we actually have a session
-      const { data: { session } } = await supabase.auth.getSession();
+      // Clear local state first
+      setIsLoggedIn(false);
       
-      if (!session) {
-        console.log("No active session found, cleaning up local state");
-        setIsLoggedIn(false);
-        navigate('/login');
-        return;
-      }
-
-      // Attempt to sign out
-      const { error } = await supabase.auth.signOut({ scope: 'local' });
+      // Attempt to sign out from Supabase
+      const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error("Logout error:", error);
-        // Even if remote logout fails, we should clean up local state
-        setIsLoggedIn(false);
-        navigate('/login');
         toast({
           title: "Session ended",
-          description: "You have been logged out due to an error.",
-          variant: "destructive",
+          description: "You have been logged out.",
         });
-        return;
+      } else {
+        toast({
+          title: "Logged out successfully",
+          description: "Come back soon!",
+        });
       }
-      
-      setIsLoggedIn(false);
-      toast({
-        title: "Logged out successfully",
-        description: "Come back soon!",
-      });
+
+      // Always navigate to login page
       navigate("/login");
     } catch (error) {
       console.error("Logout error:", error);
-      // If we catch an error here, we should still clean up local state
-      setIsLoggedIn(false);
-      navigate('/login');
       toast({
         title: "Session ended",
         description: "You have been logged out.",
       });
+      navigate('/login');
     }
+  };
+
+  const handleNavigation = (path: string) => {
+    setOpen(false);
+    navigate(path);
   };
 
   return (

@@ -29,6 +29,17 @@ export function AdminLayout() {
   const [loading, setLoading] = useState(true);
   const { isLoggedIn, checkSession, logout } = useAuth();
 
+  const handleSessionError = async () => {
+    setLoading(false);
+    await logout();
+    navigate("/login");
+    toast({
+      title: "Session Error",
+      description: "Please sign in again",
+      variant: "destructive",
+    });
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -45,8 +56,7 @@ export function AdminLayout() {
         if (!session) {
           console.log("No session found, redirecting to login");
           if (isMounted) {
-            setLoading(false);
-            navigate("/login");
+            await handleSessionError();
           }
           return;
         }
@@ -57,7 +67,7 @@ export function AdminLayout() {
         
         if (!isValid && isMounted) {
           console.log("Invalid session, logging out");
-          await logout();
+          await handleSessionError();
           return;
         }
 
@@ -67,14 +77,7 @@ export function AdminLayout() {
       } catch (error) {
         console.error("Session verification failed:", error);
         if (isMounted) {
-          setLoading(false);
-          // Try to clean up the session
-          await logout();
-          toast({
-            title: "Session Error",
-            description: "Please sign in again",
-            variant: "destructive",
-          });
+          await handleSessionError();
         }
       }
     };

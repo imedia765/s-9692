@@ -19,9 +19,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkSession = async () => {
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
-      if (error) throw error;
+      if (error) {
+        console.error("Session check failed:", error);
+        setIsLoggedIn(false);
+        return false;
+      }
       
       const isValid = !!session;
+      console.log("Session check:", { isValid, session });
       setIsLoggedIn(isValid);
       return isValid;
     } catch (error) {
@@ -37,7 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error("Remote logout failed:", error);
+        console.error("Logout failed:", error);
         toast({
           title: "Warning",
           description: "Logged out locally, but remote session cleanup failed.",

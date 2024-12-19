@@ -9,6 +9,7 @@ import { ProfileFormFields } from "./ProfileFormFields";
 import { PasswordFields } from "./PasswordFields";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { InfoIcon } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const PasswordChangeForm = () => {
   const [newPassword, setNewPassword] = useState("");
@@ -18,14 +19,25 @@ export const PasswordChangeForm = () => {
   const [isFirstTimeLogin, setIsFirstTimeLogin] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { checkSession } = useAuth();
 
   useEffect(() => {
     const fetchUserData = async () => {
       try {
         console.log("Fetching user data...");
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user?.email) {
-          throw new Error("No authenticated user found");
+        
+        // First verify the session is valid
+        const isValid = await checkSession();
+        if (!isValid) {
+          console.log("No valid session, redirecting to login");
+          navigate("/login");
+          return;
+        }
+
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        if (userError || !user?.email) {
+          console.error("Error fetching auth user:", userError);
+          throw new Error(userError?.message || "No authenticated user found");
         }
 
         const { data: memberData, error: memberError } = await supabase
@@ -46,16 +58,17 @@ export const PasswordChangeForm = () => {
         console.error("Error fetching user data:", error);
         toast({
           title: "Error",
-          description: "Failed to load user data",
+          description: "Failed to load user data. Please try logging in again.",
           variant: "destructive",
         });
+        navigate("/login");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchUserData();
-  }, [toast]);
+  }, [navigate, toast, checkSession]);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -89,6 +102,14 @@ export const PasswordChangeForm = () => {
     try {
       setIsLoading(true);
       
+      // Verify session is still valid before proceeding
+      const isValid = await checkSession();
+      if (!isValid) {
+        console.log("Session expired during form submission");
+        navigate("/login");
+        return;
+      }
+
       const updatedData = {
         full_name: String(formData.get('fullName') || ''),
         email: String(formData.get('email') || ''),
@@ -114,14 +135,16 @@ export const PasswordChangeForm = () => {
       }
 
       const { data: { user } } = await supabase.auth.getUser();
-      if (user?.email) {
-        const { error: updateError } = await supabase
-          .from('members')
-          .update(updatedData)
-          .eq('email', user.email);
-
-        if (updateError) throw updateError;
+      if (!user?.email) {
+        throw new Error("User session expired");
       }
+
+      const { error: updateError } = await supabase
+        .from('members')
+        .update(updatedData)
+        .eq('email', user.email);
+
+      if (updateError) throw updateError;
 
       toast({
         title: "Profile updated",

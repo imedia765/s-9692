@@ -14,58 +14,89 @@ export function NavigationMenu() {
   const { toast } = useToast();
 
   useEffect(() => {
-    const checkSession = async () => {
+    // Initialize session state
+    const initializeSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (error) {
-          console.error("Session check error:", error);
+          console.error("Session initialization error:", error);
           return;
         }
         setIsLoggedIn(!!session);
+        
+        // If we're on the login page but have a session, redirect to admin
+        if (session && window.location.pathname === '/login') {
+          navigate('/admin');
+        }
       } catch (error) {
-        console.error("Session check failed:", error);
+        console.error("Session initialization failed:", error);
       }
     };
 
-    checkSession();
+    initializeSession();
 
+    // Set up auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth state changed:", event, !!session);
       
-      if (event === "SIGNED_IN" && session) {
-        setIsLoggedIn(true);
-        toast({
-          title: "Signed in successfully",
-          description: "Welcome back!",
-        });
-      } else if (event === "SIGNED_OUT") {
-        setIsLoggedIn(false);
-        navigate('/login');
-      } else if (event === "TOKEN_REFRESHED") {
-        console.log("Token refreshed successfully");
-      } else if (event === "USER_UPDATED") {
-        console.log("User data updated");
+      switch (event) {
+        case "SIGNED_IN":
+          if (session) {
+            setIsLoggedIn(true);
+            toast({
+              title: "Signed in successfully",
+              description: "Welcome back!",
+            });
+            navigate('/admin');
+          }
+          break;
+          
+        case "SIGNED_OUT":
+          setIsLoggedIn(false);
+          navigate('/login');
+          break;
+          
+        case "TOKEN_REFRESHED":
+          console.log("Token refreshed successfully");
+          if (session) {
+            setIsLoggedIn(true);
+          }
+          break;
+          
+        case "USER_UPDATED":
+          console.log("User data updated");
+          break;
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [toast, navigate]);
+  }, [navigate, toast]);
 
   const handleLogout = async () => {
     try {
-      // Clear local state first
+      // Get current session first
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Clear local state
       setIsLoggedIn(false);
       
+      if (!session) {
+        console.log("No active session found");
+        navigate('/login');
+        return;
+      }
+
       // Attempt to sign out from Supabase
       const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error("Logout error:", error);
         toast({
-          title: "Session ended",
-          description: "You have been logged out.",
+          title: "Logout error",
+          description: "An error occurred during logout, but you've been signed out locally.",
+          variant: "destructive",
         });
       } else {
         toast({
@@ -78,6 +109,8 @@ export function NavigationMenu() {
       navigate("/login");
     } catch (error) {
       console.error("Logout error:", error);
+      // Ensure user is logged out locally even if remote logout fails
+      setIsLoggedIn(false);
       toast({
         title: "Session ended",
         description: "You have been logged out.",

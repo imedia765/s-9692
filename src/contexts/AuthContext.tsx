@@ -39,14 +39,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     console.log("Starting logout process...");
     
-    // Immediately update UI state
-    setIsLoggedIn(false);
-    
     try {
-      // Single signOut call with global scope
-      const { error } = await supabase.auth.signOut({
-        scope: 'global'
-      });
+      // First get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        console.log("No active session found");
+        setIsLoggedIn(false);
+        navigate("/login");
+        return;
+      }
+
+      // Attempt to sign out
+      const { error } = await supabase.auth.signOut();
       
       if (error) {
         console.error("Logout error:", error);

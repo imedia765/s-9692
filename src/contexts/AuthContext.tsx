@@ -64,9 +64,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } catch (globalError) {
         console.warn("Global logout failed:", globalError);
       }
-
-      // Clear any remaining session data
-      await supabase.auth.clearSession();
       
       toast({
         title: "Logged out",

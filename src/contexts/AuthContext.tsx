@@ -43,12 +43,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // First ensure we clear any existing session state
       setIsLoggedIn(false);
       
-      // Attempt to sign out with a single call
-      const { error } = await supabase.auth.signOut();
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
       
-      if (error) {
-        console.error("Logout error:", error);
-        // Continue with cleanup even if there's an error
+      if (session) {
+        // Only attempt to sign out if we have a session
+        const { error } = await supabase.auth.signOut({
+          scope: 'global'
+        });
+        
+        if (error) {
+          console.error("Logout error:", error);
+        }
       }
 
       // Show success message
@@ -67,6 +73,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Always ensure we clean up and redirect
       console.log("Finalizing logout...");
       setIsLoggedIn(false);
+      
+      // Clear any stored auth data
+      localStorage.removeItem('supabase.auth.token');
+      sessionStorage.removeItem('supabase.auth.token');
+      
       navigate("/login");
     }
   };

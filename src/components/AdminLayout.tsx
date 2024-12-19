@@ -27,7 +27,7 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
-  const { isLoggedIn, checkSession } = useAuth();
+  const { isLoggedIn, checkSession, logout } = useAuth();
 
   useEffect(() => {
     let isMounted = true;
@@ -35,11 +35,29 @@ export function AdminLayout() {
     const verifySession = async () => {
       try {
         console.log("Verifying admin session...");
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error("Session error:", sessionError);
+          throw sessionError;
+        }
+
+        if (!session) {
+          console.log("No session found, redirecting to login");
+          if (isMounted) {
+            setLoading(false);
+            navigate("/login");
+          }
+          return;
+        }
+
+        // Verify the session is still valid
         const isValid = await checkSession();
+        console.log("Session validation result:", isValid);
         
         if (!isValid && isMounted) {
-          console.log("No valid session found, redirecting to login");
-          navigate("/login");
+          console.log("Invalid session, logging out");
+          await logout();
           return;
         }
 
@@ -50,7 +68,8 @@ export function AdminLayout() {
         console.error("Session verification failed:", error);
         if (isMounted) {
           setLoading(false);
-          navigate("/login");
+          // Try to clean up the session
+          await logout();
           toast({
             title: "Session Error",
             description: "Please sign in again",
@@ -62,7 +81,7 @@ export function AdminLayout() {
 
     verifySession();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!isMounted) return;
       
       console.log("Auth state changed in admin layout:", event, !!session);
@@ -70,6 +89,9 @@ export function AdminLayout() {
       if (event === 'SIGNED_OUT' || !session) {
         console.log('User signed out or session ended');
         navigate("/login");
+      } else if (event === 'TOKEN_REFRESHED') {
+        console.log('Token refreshed, verifying session');
+        await verifySession();
       }
     });
 
@@ -78,7 +100,7 @@ export function AdminLayout() {
       isMounted = false;
       subscription.unsubscribe();
     };
-  }, [navigate, toast, checkSession]);
+  }, [navigate, toast, checkSession, logout]);
 
   if (loading) {
     return (

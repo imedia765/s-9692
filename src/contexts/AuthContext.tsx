@@ -40,22 +40,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("Starting logout process...");
     
     try {
-      // First get the current session
+      // First check if we have a valid session
       const { data: { session } } = await supabase.auth.getSession();
       
       if (!session) {
-        console.log("No active session found");
+        console.log("No active session found, cleaning up state");
         setIsLoggedIn(false);
         navigate("/login");
         return;
       }
 
-      // Attempt to sign out
-      const { error } = await supabase.auth.signOut();
+      // Clear local session first
+      await supabase.auth.signOut({ scope: 'local' });
+      
+      // Then attempt global signout
+      const { error } = await supabase.auth.signOut({ scope: 'global' });
       
       if (error) {
         console.error("Logout error:", error);
-        throw error;
+        // Even if there's an error, we'll clean up the local state
       }
 
       toast({

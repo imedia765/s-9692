@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { PasswordChangeForm } from "@/components/auth/PasswordChangeForm";
 import { PaymentHistorySection } from "@/components/profile/PaymentHistorySection";
+import { SupportSection } from "@/components/profile/SupportSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/components/ui/use-toast";
 import { useNavigate } from "react-router-dom";
@@ -127,13 +128,16 @@ export default function Profile() {
         <PasswordChangeForm />
         
         {memberData && (
-          <PaymentHistorySection 
-            memberId={memberData.id}
-            searchDate={searchDate}
-            searchAmount={searchAmount}
-            onSearchDateChange={setSearchDate}
-            onSearchAmountChange={setSearchAmount}
-          />
+          <>
+            <PaymentHistorySection 
+              memberId={memberData.id}
+              searchDate={searchDate}
+              searchAmount={searchAmount}
+              onSearchDateChange={setSearchDate}
+              onSearchAmountChange={setSearchAmount}
+            />
+            <SupportSection />
+          </>
         )}
       </div>
     </div>

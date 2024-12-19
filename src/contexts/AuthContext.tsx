@@ -38,29 +38,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      setIsLoggedIn(false); // Clear local state first
+      // Check if there's a valid session before attempting logout
+      const { data: { session } } = await supabase.auth.getSession();
       
+      if (!session) {
+        console.log("No active session found, cleaning up local state");
+        setIsLoggedIn(false);
+        navigate("/login");
+        return;
+      }
+
+      // Proceed with logout if there's a valid session
       const { error } = await supabase.auth.signOut();
       if (error) {
         console.error("Logout failed:", error);
         toast({
-          title: "Warning",
-          description: "Logged out locally, but remote session cleanup failed.",
+          title: "Error",
+          description: "Failed to logout. Please try again.",
           variant: "destructive",
         });
       } else {
+        setIsLoggedIn(false);
         toast({
           title: "Success",
           description: "Logged out successfully",
         });
+        navigate("/login");
       }
     } catch (error) {
       console.error("Logout error:", error);
+      // Clean up local state even if remote logout fails
+      setIsLoggedIn(false);
       toast({
         title: "Notice",
         description: "Session ended locally",
       });
-    } finally {
       navigate("/login");
     }
   };

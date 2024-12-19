@@ -39,32 +39,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     console.log("Starting logout process...");
     
-    // Immediately clear local state
+    // Immediately update UI state
     setIsLoggedIn(false);
     
     try {
-      // First try local logout
-      console.log("Attempting local logout...");
-      try {
-        const { error: localError } = await supabase.auth.signOut({ scope: 'local' });
-        if (localError) {
-          console.warn("Local logout error:", localError);
-        }
-      } catch (localError) {
-        console.warn("Local logout failed:", localError);
+      // Single signOut call with global scope
+      const { error } = await supabase.auth.signOut({
+        scope: 'global'
+      });
+      
+      if (error) {
+        console.error("Logout error:", error);
+        throw error;
       }
 
-      // Then try global logout
-      console.log("Attempting global logout...");
-      try {
-        const { error: globalError } = await supabase.auth.signOut({ scope: 'global' });
-        if (globalError) {
-          console.warn("Global logout error:", globalError);
-        }
-      } catch (globalError) {
-        console.warn("Global logout failed:", globalError);
-      }
-      
       toast({
         title: "Logged out",
         description: "You have been logged out successfully",
@@ -76,7 +64,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         description: "Session ended",
       });
     } finally {
-      // Always ensure we navigate to login and clear local state
+      // Always ensure we clean up and redirect
       console.log("Finalizing logout...");
       setIsLoggedIn(false);
       navigate("/login");

@@ -38,41 +38,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      // Check if there's a valid session before attempting logout
-      const { data: { session } } = await supabase.auth.getSession();
+      // Clear local state first to prevent UI flashing
+      setIsLoggedIn(false);
       
-      if (!session) {
-        console.log("No active session found, cleaning up local state");
-        setIsLoggedIn(false);
-        navigate("/login");
-        return;
+      // Attempt to sign out without checking session first
+      const { error } = await supabase.auth.signOut({
+        scope: 'local'  // Only clear the local session first
+      });
+      
+      if (error) {
+        console.error("Local logout failed:", error);
       }
 
-      // Proceed with logout if there's a valid session
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error("Logout failed:", error);
-        toast({
-          title: "Error",
-          description: "Failed to logout. Please try again.",
-          variant: "destructive",
+      // Then try to clear all sessions globally
+      try {
+        await supabase.auth.signOut({
+          scope: 'global'
         });
-      } else {
-        setIsLoggedIn(false);
-        toast({
-          title: "Success",
-          description: "Logged out successfully",
-        });
-        navigate("/login");
+      } catch (globalError) {
+        console.error("Global logout failed:", globalError);
+        // Don't throw here, we already cleared local session
       }
+
+      toast({
+        title: "Success",
+        description: "Logged out successfully",
+      });
+      
     } catch (error) {
       console.error("Logout error:", error);
-      // Clean up local state even if remote logout fails
-      setIsLoggedIn(false);
       toast({
         title: "Notice",
         description: "Session ended locally",
       });
+    } finally {
+      // Always navigate to login page and ensure local state is cleared
+      setIsLoggedIn(false);
       navigate("/login");
     }
   };

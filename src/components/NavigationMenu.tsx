@@ -1,127 +1,17 @@
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button } from "./ui/button";
 import { ThemeToggle } from "./ThemeToggle";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger } from "./ui/sheet";
-import { useState, useEffect } from "react";
-import { supabase } from "../integrations/supabase/client";
-import { useToast } from "./ui/use-toast";
+import { useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export function NavigationMenu() {
   const [open, setOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const navigate = useNavigate();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    // Initialize session state
-    const initializeSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error("Session initialization error:", error);
-          return;
-        }
-        setIsLoggedIn(!!session);
-        
-        // If we're on the login page but have a session, redirect to admin
-        if (session && window.location.pathname === '/login') {
-          navigate('/admin');
-        }
-      } catch (error) {
-        console.error("Session initialization failed:", error);
-      }
-    };
-
-    initializeSession();
-
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log("Auth state changed:", event, !!session);
-      
-      switch (event) {
-        case "SIGNED_IN":
-          if (session) {
-            setIsLoggedIn(true);
-            toast({
-              title: "Signed in successfully",
-              description: "Welcome back!",
-            });
-            navigate('/admin');
-          }
-          break;
-          
-        case "SIGNED_OUT":
-          setIsLoggedIn(false);
-          navigate('/login');
-          break;
-          
-        case "TOKEN_REFRESHED":
-          console.log("Token refreshed successfully");
-          if (session) {
-            setIsLoggedIn(true);
-          }
-          break;
-          
-        case "USER_UPDATED":
-          console.log("User data updated");
-          break;
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [navigate, toast]);
-
-  const handleLogout = async () => {
-    try {
-      // Get current session first
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      // Clear local state
-      setIsLoggedIn(false);
-      
-      if (!session) {
-        console.log("No active session found");
-        navigate('/login');
-        return;
-      }
-
-      // Attempt to sign out from Supabase
-      const { error } = await supabase.auth.signOut();
-      
-      if (error) {
-        console.error("Logout error:", error);
-        toast({
-          title: "Logout error",
-          description: "An error occurred during logout, but you've been signed out locally.",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Logged out successfully",
-          description: "Come back soon!",
-        });
-      }
-
-      // Always navigate to login page
-      navigate("/login");
-    } catch (error) {
-      console.error("Logout error:", error);
-      // Ensure user is logged out locally even if remote logout fails
-      setIsLoggedIn(false);
-      toast({
-        title: "Session ended",
-        description: "You have been logged out.",
-      });
-      navigate('/login');
-    }
-  };
+  const { isLoggedIn, logout } = useAuth();
 
   const handleNavigation = (path: string) => {
     setOpen(false);
-    navigate(path);
   };
 
   return (
@@ -136,7 +26,7 @@ export function NavigationMenu() {
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-2">
           {isLoggedIn ? (
-            <Button variant="outline" size="sm" onClick={handleLogout}>
+            <Button variant="outline" size="sm" onClick={logout}>
               Logout
             </Button>
           ) : (
@@ -180,7 +70,7 @@ export function NavigationMenu() {
                   <Button
                     variant="outline"
                     className="justify-start bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 text-blue-700 dark:text-blue-300"
-                    onClick={handleLogout}
+                    onClick={logout}
                   >
                     Logout
                   </Button>

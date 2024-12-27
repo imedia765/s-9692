@@ -20,33 +20,45 @@ export async function handleMemberIdLogin(memberId: string, password: string, na
     if (!member.password_changed) {
       console.log("First time login detected, using member number as password");
       
-      // Try to sign up first
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email,
-        password: member.member_number,
-        options: {
-          data: {
-            member_id: member.id,
-            member_number: member.member_number,
-            full_name: member.full_name
-          }
-        }
-      });
-
-      if (signUpError && signUpError.message !== "User already registered") {
-        console.error('Sign up error:', signUpError);
-        throw new Error("Failed to create account");
-      }
-
-      // Whether signup succeeded or user already exists, try to sign in with member number
+      // Try to sign in first with member number as password
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password: member.member_number
       });
 
       if (signInError) {
-        console.error('Sign in error:', signInError);
-        throw new Error("Invalid member ID or password");
+        console.log('Initial sign in failed, attempting signup:', signInError);
+        
+        // Only attempt signup if user doesn't exist
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password: member.member_number,
+          options: {
+            data: {
+              member_id: member.id,
+              member_number: member.member_number,
+              full_name: member.full_name
+            }
+          }
+        });
+
+        if (signUpError) {
+          console.error('Sign up error:', signUpError);
+          throw new Error("Failed to create account");
+        }
+
+        // If signup succeeded, try signing in again
+        const { data: finalSignInData, error: finalSignInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: member.member_number
+        });
+
+        if (finalSignInError) {
+          console.error('Final sign in error:', finalSignInError);
+          throw new Error("Failed to sign in after account creation");
+        }
+
+        signInData = finalSignInData;
       }
 
       if (signInData?.user) {

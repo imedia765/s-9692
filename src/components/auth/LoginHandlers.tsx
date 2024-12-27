@@ -11,64 +11,89 @@ export async function handleMemberIdLogin(memberId: string, password: string, na
   }
   
   // Use the email stored in the database
-  const email = member.email || `${member.member_number.toLowerCase()}@temp.pwaburton.org`;
+  const email = member.email;
   
   console.log("Attempting member ID login with:", { memberId, email });
   
   try {
+    // For first time login, use member number as password
+    const isFirstLogin = !member.password_changed;
+    const loginPassword = isFirstLogin ? member.member_number : password;
+
     // Try to sign in
     const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
       email,
-      password,
+      password: loginPassword,
     });
 
     if (signInError) {
       console.error('Sign in error:', signInError);
       
-      // If it's the first login attempt, try with default password
-      if (signInError.message.includes("Invalid login credentials") && !member.password_changed) {
-        console.log("First login attempt, trying with default password");
-        const { data: defaultSignInData, error: defaultSignInError } = await supabase.auth.signInWithPassword({
-          email,
-          password: member.member_number, // Use member number as default password
-        });
-
-        if (!defaultSignInError && defaultSignInData?.user) {
-          navigate("/admin");
-          return;
-        }
+      // If it's not first login or sign in failed with default password
+      if (!isFirstLogin || signInError.message !== "Invalid login credentials") {
+        throw new Error("Invalid member ID or password");
       }
-      
-      throw new Error("Invalid member ID or password");
+
+      // If first login failed, try to create account
+      console.log("First login, creating account with default password");
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+        email,
+        password: member.member_number,
+        options: {
+          data: {
+            member_id: member.id,
+            member_number: member.member_number,
+            full_name: member.full_name
+          }
+        }
+      });
+
+      if (signUpError) {
+        console.error('Sign up error:', signUpError);
+        throw signUpError;
+      }
+
+      if (signUpData?.user) {
+        // Update member record to link it with auth user
+        const { error: updateError } = await supabase
+          .from('members')
+          .update({ 
+            auth_user_id: signUpData.user.id,
+            email_verified: true 
+          })
+          .eq('id', member.id);
+
+        if (updateError) {
+          console.error('Error updating member:', updateError);
+          throw updateError;
+        }
+
+        navigate("/admin");
+        return;
+      }
     }
 
     if (signInData?.user) {
+      // Update member record if needed
+      if (!member.auth_user_id) {
+        const { error: updateError } = await supabase
+          .from('members')
+          .update({ 
+            auth_user_id: signInData.user.id,
+            email_verified: true 
+          })
+          .eq('id', member.id);
+
+        if (updateError) {
+          console.error('Error updating member:', updateError);
+        }
+      }
+
       navigate("/admin");
       return;
     }
 
-    // If sign in fails, create account with provided password
-    console.log("Sign in failed, attempting to create account");
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password: member.member_number, // Use member number as initial password
-      options: {
-        data: {
-          member_id: member.id,
-          member_number: member.member_number,
-          full_name: member.full_name
-        }
-      }
-    });
-
-    if (signUpError) {
-      console.error('Sign up error:', signUpError);
-      throw signUpError;
-    }
-
-    if (signUpData?.user) {
-      navigate("/admin");
-    }
+    throw new Error("Login failed");
   } catch (error) {
     console.error('Authentication error:', error);
     throw error;

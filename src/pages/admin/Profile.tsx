@@ -25,12 +25,26 @@ export default function Profile() {
         return;
       }
 
-      // Get member number from email (format: TM00001@pwaburton.org)
-      const email = session.user.email;
-      if (email) {
-        const memberNumber = email.split('@')[0].toUpperCase();
-        console.log('Extracted member number:', memberNumber);
-        setMemberNumber(memberNumber);
+      // Get member number from the members table using auth user id
+      const { data: memberData, error } = await supabase
+        .from('members')
+        .select('member_number')
+        .eq('auth_user_id', session.user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error('Error fetching member:', error);
+        toast({
+          title: "Error",
+          description: "Could not fetch member data",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (memberData?.member_number) {
+        console.log('Found member number:', memberData.member_number);
+        setMemberNumber(memberData.member_number);
       }
     };
 
@@ -40,18 +54,26 @@ export default function Profile() {
       if (!session) {
         navigate("/login");
       } else {
-        const email = session.user.email;
-        if (email) {
-          const memberNumber = email.split('@')[0].toUpperCase();
-          setMemberNumber(memberNumber);
-        }
+        // Update member number when auth state changes
+        const fetchMemberNumber = async () => {
+          const { data: memberData, error } = await supabase
+            .from('members')
+            .select('member_number')
+            .eq('auth_user_id', session.user.id)
+            .maybeSingle();
+
+          if (!error && memberData?.member_number) {
+            setMemberNumber(memberData.member_number);
+          }
+        };
+        fetchMemberNumber();
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, toast]);
 
   // Fetch member profile data using member number
   const { data: memberData, isLoading: memberLoading } = useQuery({

@@ -3,19 +3,19 @@ import { supabase } from "@/integrations/supabase/client";
 import { getMemberByMemberId } from "@/utils/memberAuth";
 
 export async function handleMemberIdLogin(memberId: string, password: string, navigate: ReturnType<typeof useNavigate>) {
-  // First, look up the member
-  const member = await getMemberByMemberId(memberId);
-  
-  if (!member) {
-    throw new Error("Member ID not found");
-  }
-  
-  // Use the email stored in the database
-  const email = member.email;
-  
-  console.log("Attempting member ID login with:", { memberId, email });
-  
   try {
+    // First, look up the member
+    const member = await getMemberByMemberId(memberId);
+    
+    if (!member) {
+      throw new Error("Member ID not found");
+    }
+    
+    // Use the email stored in the database
+    const email = member.email;
+    
+    console.log("Attempting member ID login with:", { memberId, email });
+    
     // For first time login, use member number as password
     const isFirstLogin = !member.password_changed;
     const loginPassword = isFirstLogin ? member.member_number : password;
@@ -50,7 +50,7 @@ export async function handleMemberIdLogin(memberId: string, password: string, na
 
       if (signUpError) {
         console.error('Sign up error:', signUpError);
-        throw signUpError;
+        throw new Error("Failed to create account");
       }
 
       if (signUpData?.user) {
@@ -61,11 +61,12 @@ export async function handleMemberIdLogin(memberId: string, password: string, na
             auth_user_id: signUpData.user.id,
             email_verified: true 
           })
-          .eq('id', member.id);
+          .eq('id', member.id)
+          .single();
 
         if (updateError) {
           console.error('Error updating member:', updateError);
-          throw updateError;
+          throw new Error("Failed to link account");
         }
 
         navigate("/admin");
@@ -82,7 +83,8 @@ export async function handleMemberIdLogin(memberId: string, password: string, na
             auth_user_id: signInData.user.id,
             email_verified: true 
           })
-          .eq('id', member.id);
+          .eq('id', member.id)
+          .single();
 
         if (updateError) {
           console.error('Error updating member:', updateError);

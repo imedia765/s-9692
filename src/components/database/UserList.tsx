@@ -23,22 +23,29 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
     try {
       console.log('Updating user role:', { userId, roleToToggle, currentRole });
       
-      // Set the new role directly
-      const finalRole = roleToToggle as SingleRole;
-      
-      const { error: profileError } = await supabase
+      // Get user profile first
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profileError) throw profileError;
+
+      // Update the role
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({ 
-          role: finalRole,
+          role: roleToToggle,
           updated_at: new Date().toISOString()
         })
         .eq('id', userId);
 
-      if (profileError) throw profileError;
+      if (updateError) throw updateError;
 
       toast({
         title: "Role updated",
-        description: `User role has been successfully updated.`,
+        description: `User role has been successfully updated to ${roleToToggle}.`,
       });
       onUpdate();
     } catch (error) {
@@ -62,7 +69,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
       // Get user profile first
       const { data: userProfile, error: profileError } = await supabase
         .from('profiles')
-        .select('email')
+        .select('*')
         .eq('id', selectedUserId)
         .single();
 
@@ -109,8 +116,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
       }
 
       // Update user role to collector
-      const user = users.find(u => u.id === selectedUserId);
-      await updateUserRole(selectedUserId, 'collector', user?.role);
+      await updateUserRole(selectedUserId, 'collector', userProfile.role);
 
       setSelectedUserId(null);
       setShowCollectorDialog(false);

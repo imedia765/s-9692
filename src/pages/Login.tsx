@@ -1,23 +1,37 @@
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { LoginTabs } from "@/components/auth/LoginTabs";
-import { useLoginHandlers } from "@/components/auth/LoginHandlers";
-import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { LoginTabs } from "../components/auth/LoginTabs";
+import { useToast } from "../hooks/use-toast";
+import { handleMemberIdLogin } from "../components/auth/LoginHandlers";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function Login() {
-  const [isLoading, setIsLoading] = useState(false);
-  const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
-  const { handleEmailSubmit, handleMemberIdSubmit } = useLoginHandlers(setIsLoading);
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    // If user is already logged in, redirect to admin
-    if (isLoggedIn) {
-      navigate('/admin');
+  const handleMemberIdSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsLoading(true);
+    
+    const formData = new FormData(e.currentTarget);
+    const memberId = formData.get('memberId') as string;
+    const password = formData.get('password') as string;
+    
+    try {
+      console.log("Attempting member ID login with:", { memberId });
+      await handleMemberIdLogin(memberId, password, navigate);
+    } catch (error) {
+      console.error("Member ID login error:", error);
+      toast({
+        title: "Login failed",
+        description: error instanceof Error ? error.message : "Invalid member ID or password",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
-  }, [isLoggedIn, navigate]);
+  };
 
   return (
     <div className="container max-w-lg mx-auto py-10">
@@ -25,9 +39,8 @@ export default function Login() {
         <CardHeader>
           <CardTitle className="text-2xl text-center">Login</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <LoginTabs
-            onEmailSubmit={handleEmailSubmit}
+        <CardContent>
+          <LoginTabs 
             onMemberIdSubmit={handleMemberIdSubmit}
             isLoading={isLoading}
           />

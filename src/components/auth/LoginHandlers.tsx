@@ -1,124 +1,76 @@
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
+import { getMemberByMemberId } from "@/utils/memberAuth";
 
-export const useLoginHandlers = (setIsLoggedIn: (value: boolean) => void) => {
-  const { toast } = useToast();
+export async function handleMemberIdLogin(memberId: string, password: string, navigate: ReturnType<typeof useNavigate>) {
+  // First, look up the member
+  const member = await getMemberByMemberId(memberId);
+  
+  if (!member) {
+    throw new Error("Member ID not found");
+  }
+  
+  // Use the email stored in the database
+  const email = member.email || `${member.member_number.toLowerCase()}@temp.pwaburton.org`;
+  
+  console.log("Attempting member ID login with:", { memberId, email });
+  
+  try {
+    // Try to sign in
+    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-  const handleEmailSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const email = formData.get("email") as string;
-    const password = formData.get("password") as string;
-
-    try {
-      console.log("Attempting email login for:", email);
+    if (signInError) {
+      console.error('Sign in error:', signInError);
       
-      // First check if this is a valid member email
-      const { data: memberData, error: memberError } = await supabase
-        .from('members')
-        .select('id, email_verified, profile_updated')
-        .eq('email', email)
-        .maybeSingle();
+      // If it's the first login attempt, try with default password
+      if (signInError.message.includes("Invalid login credentials") && !member.password_changed) {
+        console.log("First login attempt, trying with default password");
+        const { data: defaultSignInData, error: defaultSignInError } = await supabase.auth.signInWithPassword({
+          email,
+          password: member.member_number, // Use member number as default password
+        });
 
-      if (memberError) {
-        console.error("Member lookup error:", memberError);
-        throw new Error("Error looking up member details");
+        if (!defaultSignInError && defaultSignInData?.user) {
+          navigate("/admin");
+          return;
+        }
       }
-
-      if (!memberData) {
-        console.error("No member found with email:", email);
-        throw new Error("No member found with this email address. Please check your credentials or use the Member ID login if you haven't updated your profile yet.");
-      }
-
-      // Attempt to sign in
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (error) {
-        console.error("Sign in error:", error);
-        throw error;
-      }
-
-      console.log("Login successful:", data);
-
-      toast({
-        title: "Login successful",
-        description: "Welcome back!",
-      });
-      setIsLoggedIn(true);
-    } catch (error) {
-      console.error("Email login error:", error);
-      toast({
-        title: "Login failed",
-        description: error instanceof Error ? error.message : "An error occurred during login",
-        variant: "destructive",
-      });
-    }
-  };
-
-  const handleMemberIdSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const memberId = (formData.get("memberId") as string).toUpperCase().trim();
-    const password = formData.get("memberPassword") as string;
-
-    try {
-      console.log("Attempting member ID login for:", memberId);
       
-      // First, get the member details
-      const { data: member, error: memberError } = await supabase
-        .from('members')
-        .select('email, default_password_hash')
-        .eq('member_number', memberId)
-        .maybeSingle();
-
-      if (memberError) {
-        console.error("Member lookup error:", memberError);
-        throw new Error("Error looking up member details");
-      }
-
-      if (!member) {
-        console.error("No member found with ID:", memberId);
-        throw new Error("Invalid Member ID. Please check your credentials and try again.");
-      }
-
-      if (!member.email) {
-        console.error("No email found for member:", memberId);
-        throw new Error("No email associated with this Member ID. Please contact support.");
-      }
-
-      // Attempt to sign in
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: member.email,
-        password: password,
-      });
-
-      if (signInError) {
-        console.error("Sign in error:", signInError);
-        throw signInError;
-      }
-
-      console.log("Login successful for member:", memberId);
-
-      toast({
-        title: "Login successful",
-        description: "Welcome! Please update your profile information.",
-      });
-      setIsLoggedIn(true);
-    } catch (error) {
-      console.error("Member ID login error:", error);
-      toast({
-        title: "Login failed",
-        description: error instanceof Error ? error.message : "Invalid Member ID or password",
-        variant: "destructive",
-      });
+      throw new Error("Invalid member ID or password");
     }
-  };
 
-  return {
-    handleEmailSubmit,
-    handleMemberIdSubmit,
-  };
-};
+    if (signInData?.user) {
+      navigate("/admin");
+      return;
+    }
+
+    // If sign in fails, create account with provided password
+    console.log("Sign in failed, attempting to create account");
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password: member.member_number, // Use member number as initial password
+      options: {
+        data: {
+          member_id: member.id,
+          member_number: member.member_number,
+          full_name: member.full_name
+        }
+      }
+    });
+
+    if (signUpError) {
+      console.error('Sign up error:', signUpError);
+      throw signUpError;
+    }
+
+    if (signUpData?.user) {
+      navigate("/admin");
+    }
+  } catch (error) {
+    console.error('Authentication error:', error);
+    throw error;
+  }
+}

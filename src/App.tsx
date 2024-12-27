@@ -4,12 +4,10 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ThemeProvider } from "next-themes";
-import { AuthProvider } from "@/contexts/AuthContext";
 import { NavigationMenu } from "@/components/NavigationMenu";
 import Footer from "@/components/Footer";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
-import FirstTimeLogin from "./pages/FirstTimeLogin";
 import Register from "./pages/Register";
 import ChangePassword from "./pages/ChangePassword";
 import TermsAndConditions from "./pages/TermsAndConditions";
@@ -34,14 +32,12 @@ const App = () => (
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <AuthProvider>
-            <div className="min-h-screen flex flex-col">
-              <NavigationMenu />
-              <div className="flex-grow">
-                <Routes>
+          <div className="min-h-screen flex flex-col">
+            <NavigationMenu />
+            <div className="flex-grow">
+              <Routes>
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
-                <Route path="/first-time-login" element={<FirstTimeLogin />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/change-password" element={<ChangePassword />} />
                 <Route path="/terms" element={<TermsAndConditions />} />
@@ -57,11 +53,10 @@ const App = () => (
                   <Route path="support" element={<Support />} />
                   <Route path="profile" element={<Profile />} />
                 </Route>
-                </Routes>
-              </div>
-              <Footer />
+              </Routes>
             </div>
-          </AuthProvider>
+            <Footer />
+          </div>
         </BrowserRouter>
       </TooltipProvider>
     </ThemeProvider>

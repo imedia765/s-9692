@@ -10,115 +10,114 @@ import { Button } from "./ui/button";
 import { useEffect, useState } from "react";
 import { supabase } from "../integrations/supabase/client";
 import { useToast } from "./ui/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
+import { UserRole } from "@/types/roles";
 
+// Define menu items with role restrictions
 const menuItems = [
-  { icon: LayoutDashboard, label: "Dashboard", to: "/admin" },
-  { icon: Users, label: "Members", to: "/admin/members" },
-  { icon: UserCheck, label: "Collectors", to: "/admin/collectors" },
-  { icon: ClipboardList, label: "Registrations", to: "/admin/registrations" },
-  { icon: Database, label: "Database", to: "/admin/database" },
-  { icon: DollarSign, label: "Finance", to: "/admin/finance" },
-  { icon: HeadsetIcon, label: "Support Tickets", to: "/admin/support" },
-  { icon: UserCircle, label: "Profile", to: "/admin/profile" },
+  { icon: LayoutDashboard, label: "Dashboard", to: "/admin", roles: ["admin"] },
+  { icon: Users, label: "Members", to: "/admin/members", roles: ["admin"] },
+  { icon: UserCheck, label: "Collectors", to: "/admin/collectors", roles: ["admin"] },
+  { icon: ClipboardList, label: "Registrations", to: "/admin/registrations", roles: ["admin"] },
+  { icon: Database, label: "Database", to: "/admin/database", roles: ["admin"] },
+  { icon: DollarSign, label: "Finance", to: "/admin/finance", roles: ["admin", "collector"] },
+  { icon: HeadsetIcon, label: "Support Tickets", to: "/admin/support", roles: ["admin"] },
+  { icon: UserCircle, label: "Profile", to: "/admin/profile", roles: ["admin", "collector", "member"] },
 ];
 
 export function AdminLayout() {
   const navigate = useNavigate();
-  const { toast } = useToast();
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
-  const { isLoggedIn, checkSession, logout } = useAuth();
-
-  const handleSessionError = async () => {
-    setLoading(false);
-    await logout();
-    navigate("/login");
-    toast({
-      title: "Session Error",
-      description: "Please sign in again",
-      variant: "destructive",
-    });
-  };
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
-    let isMounted = true;
-
-    const verifySession = async () => {
+    const checkSession = async () => {
       try {
-        console.log("Verifying admin session...");
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        setLoading(true);
+        const { data: { session }, error } = await supabase.auth.getSession();
         
-        if (sessionError) {
-          console.error("Session error:", sessionError);
-          throw sessionError;
+        if (error) {
+          console.error("Session check error:", error);
+          setIsLoggedIn(false);
+          navigate("/login");
+          return;
         }
 
         if (!session) {
-          console.log("No session found, redirecting to login");
-          if (isMounted) {
-            await handleSessionError();
-          }
+          setIsLoggedIn(false);
+          navigate("/login");
           return;
         }
 
-        // Verify the session is still valid
-        const isValid = await checkSession();
-        console.log("Session validation result:", isValid);
+        // Get user role from profiles table
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single();
+
+        if (profileError) {
+          console.error("Profile fetch error:", profileError);
+          setIsLoggedIn(false);
+          navigate("/login");
+          return;
+        }
+
+        setUserRole(profile.role);
+        setIsLoggedIn(true);
+
+        // Check if current route is allowed for user's role
+        const currentPath = window.location.pathname;
+        const allowedPaths = menuItems.filter(item => item.roles.includes(profile.role)).map(item => item.to);
         
-        if (!isValid && isMounted) {
-          console.log("Invalid session, logging out");
-          await handleSessionError();
-          return;
+        if (!allowedPaths.includes(currentPath) && currentPath !== "/admin/profile") {
+          console.log("Access denied to path:", currentPath);
+          navigate("/admin/profile");
+          toast({
+            title: "Access Restricted",
+            description: "You don't have permission to access this page",
+            variant: "destructive",
+          });
         }
 
-        if (isMounted) {
-          setLoading(false);
-        }
       } catch (error) {
-        console.error("Session verification failed:", error);
-        if (isMounted) {
-          await handleSessionError();
-        }
+        console.error("Auth check error:", error);
+        setIsLoggedIn(false);
+        navigate("/login");
+      } finally {
+        setLoading(false);
       }
     };
 
-    verifySession();
+    checkSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!isMounted) return;
+      console.log("Auth state changed:", event, !!session);
       
-      console.log("Auth state changed in admin layout:", event, !!session);
-      
-      if (event === 'SIGNED_OUT' || !session) {
-        console.log('User signed out or session ended');
+      if (event === "SIGNED_OUT") {
+        setIsLoggedIn(false);
+        setUserRole(null);
         navigate("/login");
-      } else if (event === 'TOKEN_REFRESHED') {
-        console.log('Token refreshed, verifying session');
-        await verifySession();
       }
     });
 
     return () => {
-      console.log("Cleaning up admin layout auth subscription");
-      isMounted = false;
       subscription.unsubscribe();
     };
-  }, [navigate, toast, checkSession, logout]);
+  }, [navigate, toast]);
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary mx-auto"></div>
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
-      </div>
-    );
+    return <div>Loading...</div>;
   }
 
   if (!isLoggedIn) {
+    navigate("/login");
     return null;
   }
+
+  // Filter menu items based on user role
+  const allowedMenuItems = menuItems.filter(item => userRole && item.roles.includes(userRole));
 
   return (
     <div className="min-h-screen flex flex-col w-full bg-background">
@@ -135,7 +134,7 @@ export function AdminLayout() {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-[calc(100vw-2rem)] max-w-[calc(1400px-4rem)]">
-              {menuItems.map((item) => (
+              {allowedMenuItems.map((item) => (
                 <DropdownMenuItem
                   key={item.to}
                   onClick={() => navigate(item.to)}

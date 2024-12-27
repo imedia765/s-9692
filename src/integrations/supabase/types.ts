@@ -209,6 +209,7 @@ export type Database = {
       members: {
         Row: {
           address: string | null
+          auth_user_id: string | null
           collector: string | null
           collector_id: string | null
           cors_enabled: boolean | null
@@ -237,6 +238,7 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          auth_user_id?: string | null
           collector?: string | null
           collector_id?: string | null
           cors_enabled?: boolean | null
@@ -265,6 +267,7 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          auth_user_id?: string | null
           collector?: string | null
           collector_id?: string | null
           cors_enabled?: boolean | null
@@ -306,6 +309,7 @@ export type Database = {
           amount: number
           collector_id: string | null
           created_at: string
+          created_by: string | null
           id: string
           member_id: string | null
           notes: string | null
@@ -318,6 +322,7 @@ export type Database = {
           amount: number
           collector_id?: string | null
           created_at?: string
+          created_by?: string | null
           id?: string
           member_id?: string | null
           notes?: string | null
@@ -330,6 +335,7 @@ export type Database = {
           amount?: number
           collector_id?: string | null
           created_at?: string
+          created_by?: string | null
           id?: string
           member_id?: string | null
           notes?: string | null
@@ -357,26 +363,56 @@ export type Database = {
       }
       profiles: {
         Row: {
+          address: string | null
           created_at: string
+          date_of_birth: string | null
           email: string | null
+          full_name: string | null
+          gender: string | null
           id: string
-          role: Database["public"]["Enums"]["user_role"] | null
+          marital_status: string | null
+          member_number: string | null
+          phone: string | null
+          postcode: string | null
+          profile_completed: boolean | null
+          role: Database["public"]["Enums"]["user_role"]
+          town: string | null
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          address?: string | null
           created_at?: string
+          date_of_birth?: string | null
           email?: string | null
+          full_name?: string | null
+          gender?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["user_role"] | null
+          marital_status?: string | null
+          member_number?: string | null
+          phone?: string | null
+          postcode?: string | null
+          profile_completed?: boolean | null
+          role?: Database["public"]["Enums"]["user_role"]
+          town?: string | null
           updated_at?: string
           user_id?: string | null
         }
         Update: {
+          address?: string | null
           created_at?: string
+          date_of_birth?: string | null
           email?: string | null
+          full_name?: string | null
+          gender?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["user_role"] | null
+          marital_status?: string | null
+          member_number?: string | null
+          phone?: string | null
+          postcode?: string | null
+          profile_completed?: boolean | null
+          role?: Database["public"]["Enums"]["user_role"]
+          town?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -502,6 +538,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_profile: {
+        Args: {
+          p_id: string
+          p_email: string
+          p_user_id: string
+        }
+        Returns: undefined
+      }
+      delete_collector: {
+        Args: {
+          collector_id: string
+        }
+        Returns: undefined
+      }
       merge_duplicate_collectors: {
         Args: Record<PropertyKey, never>
         Returns: {

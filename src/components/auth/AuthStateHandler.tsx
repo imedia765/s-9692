@@ -17,43 +17,29 @@ export const useAuthStateHandler = (setIsLoggedIn: (value: boolean) => void) => 
         
         if (error) {
           console.error("Session check error:", error);
-          handleAuthError(error);
+          setIsLoggedIn(false);
+          navigate("/login");
           return;
         }
         
         if (session) {
           console.log("Active session found");
           setIsLoggedIn(true);
-          navigate("/admin");
+          if (window.location.pathname === "/login") {
+            navigate("/admin");
+          }
         } else {
           console.log("No active session");
           setIsLoggedIn(false);
-          navigate("/login");
+          if (window.location.pathname !== "/login" && window.location.pathname !== "/register") {
+            navigate("/login");
+          }
         }
       } catch (error) {
         console.error("Session check failed:", error);
-        handleAuthError(error);
+        setIsLoggedIn(false);
+        navigate("/login");
       }
-    };
-
-    const handleAuthError = async (error: any) => {
-      console.error("Auth error occurred:", error);
-      
-      // Clear any stale auth data
-      await supabase.auth.signOut();
-      setIsLoggedIn(false);
-      
-      // Clear local storage auth data
-      localStorage.removeItem('supabase.auth.token');
-      sessionStorage.removeItem('supabase.auth.token');
-      
-      toast({
-        title: "Authentication Error",
-        description: "Please sign in again",
-        variant: "destructive",
-      });
-      
-      navigate("/login");
     };
 
     checkSession();
@@ -70,7 +56,7 @@ export const useAuthStateHandler = (setIsLoggedIn: (value: boolean) => void) => 
               title: "Signed in successfully",
               description: "Welcome back!",
             });
-            handleSuccessfulLogin(session, navigate);
+            navigate("/admin");
           }
           break;
           
@@ -89,13 +75,8 @@ export const useAuthStateHandler = (setIsLoggedIn: (value: boolean) => void) => 
           
         case "USER_UPDATED":
           console.log("User data updated");
-          break;
-          
-        case "INITIAL_SESSION":
-          if (!session) {
-            console.log("No initial session");
-            setIsLoggedIn(false);
-            navigate("/login");
+          if (session) {
+            setIsLoggedIn(true);
           }
           break;
       }
@@ -106,41 +87,4 @@ export const useAuthStateHandler = (setIsLoggedIn: (value: boolean) => void) => 
       subscription.unsubscribe();
     };
   }, [navigate, setIsLoggedIn, toast]);
-};
-
-const handleSuccessfulLogin = async (session: any, navigate: (path: string) => void) => {
-  try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user?.email) return;
-
-    const { data: member, error } = await supabase
-      .from('members')
-      .select('password_changed, profile_updated, email_verified')
-      .eq('email', user.email)
-      .maybeSingle();
-
-    if (error) {
-      console.error("Error checking member status:", error);
-      navigate("/admin");
-      return;
-    }
-
-    // Check if profile needs to be updated
-    if (member && !member.profile_updated) {
-      navigate("/admin/profile");
-      return;
-    }
-
-    // Check if password needs to be changed
-    if (member && !member.password_changed) {
-      navigate("/admin/profile");
-      return;
-    }
-
-    // If all checks pass, redirect to admin dashboard
-    navigate("/admin");
-  } catch (error) {
-    console.error("Error in handleSuccessfulLogin:", error);
-    navigate("/admin");
-  }
 };

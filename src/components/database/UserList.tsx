@@ -26,7 +26,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
       // Set the new role directly
       const finalRole = roleToToggle as SingleRole;
       
-      const { error } = await supabase
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ 
           role: finalRole,
@@ -34,7 +34,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
         })
         .eq('id', userId);
 
-      if (error) throw error;
+      if (profileError) throw profileError;
 
       toast({
         title: "Role updated",
@@ -58,6 +58,15 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
 
     try {
       setUpdating(selectedUserId);
+      
+      // Get user profile first
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('email')
+        .eq('id', selectedUserId)
+        .single();
+
+      if (profileError) throw profileError;
 
       if (isNew) {
         if (!collectorName.trim()) {
@@ -92,6 +101,7 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
             name: collectorName,
             prefix,
             number: nextNumber,
+            email: userProfile.email,
             active: true
           });
 
@@ -111,6 +121,8 @@ export function UserList({ users, onUpdate, updating, setUpdating }: UserListPro
           ? "New collector created and role updated" 
           : "User role updated to collector",
       });
+      
+      onUpdate();
     } catch (error) {
       console.error('Error creating collector:', error);
       toast({

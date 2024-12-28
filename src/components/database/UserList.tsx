@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useToast } from "@/components/ui/use-toast";
 import { CollectorDialog } from "./CollectorDialog";
 import { UserCard } from "./UserCard";
+import { updateUserRole, createCollectorProfile } from "@/utils/roleManagement";
 
 interface UserListProps {
   users: any[];
